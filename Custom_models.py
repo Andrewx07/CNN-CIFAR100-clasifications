@@ -89,10 +89,8 @@ class vgg16(nn.Module):
         )
 
         self.relu_linear = nn.Sequential(
-          
             nn.Linear(512, 4096),
             nn.ReLU(),
-            
             nn.Linear(4096, 4096),
             nn.ReLU(),
             nn.Linear(4096, 100),
@@ -119,18 +117,16 @@ class ResNet9(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.conv1 = conv(3, 64)
-        self.conv2 = conv(64, 128, pool=True)
-        self.res1 = nn.Sequential(conv(128, 128), conv(128, 128))
+        self.conv1 = conv(3, 150)
+        self.conv2 = conv(150, 300, pool=True)
+        self.res1 = nn.Sequential(conv(250, 250), conv(250, 250))
 
-        self.conv3 = conv(128, 256, pool=True)
-        self.conv4 = conv(256, 512, pool=True)
-        self.res2 = nn.Sequential(conv(512, 512), conv(512, 512))
-        self.conv5 = conv(512, 1028, pool=True)
-        self.res3 = nn.Sequential(conv(1028, 1028), conv(1028, 1028))
+        self.conv3 = conv(300, 500, pool=True)
+        self.conv4 = conv(500, 1000, pool=True)
+        self.res2 = nn.Sequential(conv(1000, 1000), conv(1000, 1000))
 
         self.classifier = nn.Sequential(
-            nn.MaxPool2d(2), nn.Flatten(), nn.Linear(1028, 100)
+            nn.MaxPool2d(4), nn.Flatten(), nn.Dropout(p=0.2), nn.Linear(1000, 100)
         )
 
     def forward(self, xb):
@@ -140,7 +136,5 @@ class ResNet9(nn.Module):
         out = self.conv3(out)
         out = self.conv4(out)
         out = self.res2(out) + out
-        out = self.conv5(out)
-        out = self.res3(out) + out
         out = self.classifier(out)
         return out

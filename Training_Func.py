@@ -12,10 +12,10 @@ def training_cycle(model, training_time, optimizer, criterion, dataset):
     for epoch in range(training_time):
         train_loss = 0.0
         valid_loss = 0.0
-        test_loss = 0.0
 
         for inputs, labels in dataset["train_dataloader"]:
-            inputs, labels = inputs.cuda(), labels.cuda()
+            if torch.cuda.is_available():
+                inputs, labels = inputs.cuda(), labels.cuda()
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -25,35 +25,17 @@ def training_cycle(model, training_time, optimizer, criterion, dataset):
 
         model.eval()
         for inputs, labels in dataset["validation_dataloader"]:
-            inputs, labels = inputs.cuda(), labels.cuda()
+            if torch.cuda.is_available():
+                inputs, labels = inputs.cuda(), labels.cuda()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             valid_loss += loss.item()
 
-        class_correct_test = list(0.0 for i in range(100))
-        class_total_test = list(0.0 for i in range(100))
-        class_correct_val = list(0.0 for i in range(100))
-        class_total_val = list(0.0 for i in range(100))
-
-        for images, lab in dataset["test_dataloader"]:
-            images, lab = images.cuda(), lab.cuda()
-            output = model(images)
-            loss = criterion(output, lab)
-            test_loss += loss.item()
-            _, pmodel = torch.max(output, 1)
-            correct = np.squeeze(pmodel.eq(lab.data.view_as(pmodel)))
-
-            for idx in range(dataset["batch_size"]):
-                label = lab[idx]
-                class_correct_test[label] += correct[idx].item()
-                class_total_test[label] += 1
-
-            test_loss = test_loss / len(dataset["test_dataloader"])
-            accuracy.append(
-                float(np.sum(class_correct_test) / np.sum(class_total_test))
-            )
-
         running_epoch.append(float(epoch))
+
+        accuracy, class_correct_test, class_total_test, test_loss = testing_func(
+            dataset, model, criterion
+        )
 
         train_loss = train_loss / len(dataset["train_dataloader"])
         print("\n[Para la epoca", epoch + 1, "] \nloss:", train_loss)
@@ -68,15 +50,38 @@ def training_cycle(model, training_time, optimizer, criterion, dataset):
         print(
             f"\nTest Accuracy : {float(100. * np.sum(class_correct_test) / np.sum(class_total_test))}% where {int(np.sum(class_correct_test))} of {int(np.sum(class_total_test))} were pmodelicted correctly"
         )
-        
 
     return (
         graphic1,
         graphic2,
         running_epoch,
         accuracy,
-        acc_val,
         class_total_test,
         class_correct_test,
         test_loss,
     )
+
+
+def testing_func(dataset, model, criterion):
+    class_correct_test = list(0.0 for i in range(100))
+    class_total_test = list(0.0 for i in range(100))
+    test_loss = 0.0
+    accuracy = []
+    for images, lab in dataset["test_dataloader"]:
+        if torch.cuda.is_available():
+            images, lab = images.cuda(), lab.cuda()
+        output = model(images)
+        loss = criterion(output, lab)
+        test_loss += loss.item()
+        _, pmodel = torch.max(output, 1)
+        correct = np.squeeze(pmodel.eq(lab.data.view_as(pmodel)))
+
+        for idx in range(dataset["batch_size"]):
+            label = lab[idx]
+            class_correct_test[label] += correct[idx].item()
+            class_total_test[label] += 1
+
+        test_loss = test_loss / len(dataset["test_dataloader"])
+
+        accuracy.append(float(np.sum(class_correct_test) / np.sum(class_total_test)))
+    return accuracy, class_correct_test, class_total_test, test_loss
